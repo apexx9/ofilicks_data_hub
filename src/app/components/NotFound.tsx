@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Compass, Home, ArrowLeft } from 'lucide-react';
 
 export function NotFound() {

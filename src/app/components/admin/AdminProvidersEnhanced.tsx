@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api, ApiProvider } from '../../../lib/api';
+import { api, ApiProvider } from '@/lib/api';
 import { Plus, CheckCircle, Edit3, DollarSign, TrendingUp, Key, Shield } from 'lucide-react';
 
 const PROVIDER_TYPES = ["DATA4UGH", "GODLYDATA", "SIMULATED"];
