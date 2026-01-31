@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { projectId } from '../../utils/supabase/info';
+import { projectId } from '@/utils/supabase/info';
 
 // Paystack configuration
 // Paystack configuration (Public key only for frontend)
