@@ -9,6 +9,7 @@ export function AdminBundles() {
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingBundle, setEditingBundle] = useState<Bundle | null>(null);
+  const [selectedBundles, setSelectedBundles] = useState<string[]>([]);
   const [error, setError] = useState('');
 
   const [formData, setFormData] = useState({
@@ -108,6 +109,42 @@ export function AdminBundles() {
     }
   };
 
+  const toggleSelectAll = () => {
+    if (selectedBundles.length === bundles.length) {
+      setSelectedBundles([]);
+    } else {
+      setSelectedBundles(bundles.map(b => b.id));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    if (selectedBundles.includes(id)) {
+      setSelectedBundles(selectedBundles.filter(bid => bid !== id));
+    } else {
+      setSelectedBundles([...selectedBundles, id]);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedBundles.length} bundles?`)) return;
+
+    try {
+      setIsLoading(true);
+      // Execute deletions in sequence to avoid race conditions/overwhelming server
+      for (const id of selectedBundles) {
+        await api.deleteBundle(id);
+      }
+      setSelectedBundles([]);
+      await loadBundles();
+      alert('Selected bundles deleted successfully');
+    } catch (err: any) {
+      alert('Failed to delete some bundles: ' + err.message);
+      await loadBundles(); // Reload to show what's left
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const resetForm = () => {
     setEditingBundle(null);
     setFormData({
@@ -133,6 +170,15 @@ export function AdminBundles() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold text-gray-900">Manage Bundles</h2>
         <div className="flex gap-2">
+          {selectedBundles.length > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              <Trash2 className="w-5 h-5" />
+              Delete Selected ({selectedBundles.length})
+            </button>
+          )}
           <button
             onClick={async () => {
               if (confirm('Are you sure you want to delete ALL bundles? This cannot be undone.')) {
@@ -170,6 +216,14 @@ export function AdminBundles() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
+              <th className="px-4 py-3 w-4">
+                <input
+                  type="checkbox"
+                  checked={bundles.length > 0 && selectedBundles.length === bundles.length}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+              </th>
               <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Network</th>
               <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Name</th>
               <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Volume</th>
@@ -182,7 +236,15 @@ export function AdminBundles() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {bundles.map((bundle) => (
-              <tr key={bundle.id} className="hover:bg-gray-50">
+              <tr key={bundle.id} className={`hover:bg-gray-50 ${selectedBundles.includes(bundle.id) ? 'bg-blue-50' : ''}`}>
+                <td className="px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedBundles.includes(bundle.id)}
+                    onChange={() => toggleSelect(bundle.id)}
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </td>
                 <td className="px-4 py-3 text-sm text-gray-900">{bundle.network.replace('_', ' ')}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{bundle.name}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{bundle.volume}</td>
