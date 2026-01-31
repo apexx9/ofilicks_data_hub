@@ -36,8 +36,8 @@ export function Dashboard() {
       const orders = ordersRes.orders;
       const transactions = transactionsRes.transactions;
 
-      setRecentOrders(orders.slice(0, 5));
-      setRecentTransactions(transactions.slice(0, 5));
+      setRecentOrders(orders?.slice(0, 5) || []);
+      setRecentTransactions(transactions?.slice(0, 5) || []);
 
       setStats({
         totalOrders: orders.length,

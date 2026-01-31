@@ -323,6 +323,7 @@ class ApiClient {
         totalVolume: number;
         totalCost: number;
         totalProfit: number;
+        providerBalance: number;
       }
     }>('/admin/revenue', {}, true);
   }

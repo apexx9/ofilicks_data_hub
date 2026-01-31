@@ -11,6 +11,13 @@ import {
   verifyWebhookSignature
 } from "./payments.ts";
 import * as wallet from "./wallet.ts";
+import { Data4UghProvider, GodlydataProvider } from "./providers.ts";
+
+const EONB_API_KEY = "17|EOnB1gYNjudGGuQHDAHD7mfhAhKUE1GT3dDZowWF8d0cf4f0";
+const GODLYDATA_API_KEY = "7|L85ClQ9Js0isROgsYjRXhmQE6hOuyJryrxBWhNua4ea257e2";
+
+const eonb = new Data4UghProvider(EONB_API_KEY);
+const godly = new GodlydataProvider(GODLYDATA_API_KEY);
 
 // Import Deno types
 /// <reference lib="deno.ns" /> /// <reference lib="deno.unstable" />
@@ -50,17 +57,46 @@ const del = async (key: string): Promise<void> => {
 
 // Wallet functions handled by wallet.ts
 
-// Simulate data purchase (replace with actual API call)
-const simulateDataPurchase = async (order: any): Promise<boolean> => {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
+// Process order via real provider
+const processOrderWithProvider = async (order: any): Promise<boolean> => {
+  try {
+    // Determine provider based on network or availability
+    // Most Ghanaian networks work best with EOnB (Data4UGH)
+    // Godlydata is a great backup.
 
-  // Simulate 95% success rate
-  const success = Math.random() > 0.05;
+    // For now, let's use EOnB for everything since keys are provided
+    const res = await eonb.purchaseBundle({
+      network: order.network,
+      recipient: order.phoneNumber,
+      capacity: parseInt(order.volume.replace(/[^0-9]/g, "")) || 1, // Extract GB/MB
+      reference: order.id
+    });
 
-  console.log(`Processing order ${order.id} via provider: ${success ? 'SUCCESS' : 'FAILED'}`);
+    if (res.success) {
+      console.log(`Provider success for order ${order.id}: ${res.message}`);
+      return true;
+    }
 
-  return success;
+    // Try fallback to Godlydata if EOnB fails
+    console.warn(`Primary provider (EOnB) failed for ${order.id}, trying Godlydata...`);
+    const resBackup = await godly.purchaseBundle({
+      networkReference: order.network.toLowerCase(),
+      recipientPhone: order.phoneNumber,
+      capacityInGb: parseInt(order.volume.replace(/[^0-9]/g, "")) || 1,
+      orderReference: order.id
+    });
+
+    if (resBackup.success) {
+      console.log(`Backup provider (Godlydata) success for order ${order.id}`);
+      return true;
+    }
+
+    console.error(`Both providers failed for order ${order.id}: ${resBackup.message}`);
+    return false;
+  } catch (error) {
+    console.error(`Integration error for order ${order.id}:`, error);
+    return false;
+  }
 };
 
 // Get user by ID function from auth.ts
@@ -337,128 +373,7 @@ const seedDatabase = async () => {
       console.log("Admin user may already exist");
     }
 
-    // Create sample users
-    const sampleUsers = [
-      { email: "user@example.com", password: "user123", name: "John Doe", role: "USER" as const },
-      { email: "agent@example.com", password: "agent123", name: "Jane Agent", role: "AGENT" as const },
-      { email: "dealer@example.com", password: "dealer123", name: "Mike Dealer", role: "DEALER" as const },
-    ];
-
-    for (const userData of sampleUsers) {
-      try {
-        await signup(userData.email, userData.password, userData.name, userData.role);
-        console.log(`✓ ${userData.role} user created: ${userData.email}`);
-      } catch (error) {
-        console.log(`${userData.role} user may already exist`);
-      }
-    }
-
-    // Create sample bundles
-    const sampleBundles = [
-      // MTN Bundles
-      {
-        network: "MTN" as const,
-        name: "MTN 1GB Daily",
-        volume: "1GB",
-        validity: "1 day",
-        pricing: { USER: 2.50, AGENT: 2.20, DEALER: 2.00 },
-        costPrice: 1.80,
-        enabled: true,
-      },
-      {
-        network: "MTN" as const,
-        name: "MTN 5GB Weekly",
-        volume: "5GB",
-        validity: "7 days",
-        pricing: { USER: 10.00, AGENT: 9.00, DEALER: 8.50 },
-        costPrice: 7.50,
-        enabled: true,
-      },
-      {
-        network: "MTN" as const,
-        name: "MTN 10GB Monthly",
-        volume: "10GB",
-        validity: "30 days",
-        pricing: { USER: 20.00, AGENT: 18.00, DEALER: 17.00 },
-        costPrice: 15.00,
-        enabled: true,
-      },
-      // AirtelTigo iShare
-      {
-        network: "AIRTELTIGO_ISHARE" as const,
-        name: "AT iShare 1GB",
-        volume: "1GB",
-        validity: "1 day",
-        pricing: { USER: 2.00, AGENT: 1.80, DEALER: 1.60 },
-        costPrice: 1.40,
-        enabled: true,
-      },
-      {
-        network: "AIRTELTIGO_ISHARE" as const,
-        name: "AT iShare 3GB",
-        volume: "3GB",
-        validity: "3 days",
-        pricing: { USER: 5.00, AGENT: 4.50, DEALER: 4.20 },
-        costPrice: 3.80,
-        enabled: true,
-      },
-      // AirtelTigo BigTime
-      {
-        network: "AIRTELTIGO_BIGTIME" as const,
-        name: "AT BigTime 5GB",
-        volume: "5GB",
-        validity: "7 days",
-        pricing: { USER: 9.50, AGENT: 8.50, DEALER: 8.00 },
-        costPrice: 7.00,
-        enabled: true,
-      },
-      {
-        network: "AIRTELTIGO_BIGTIME" as const,
-        name: "AT BigTime 10GB",
-        volume: "10GB",
-        validity: "30 days",
-        pricing: { USER: 18.00, AGENT: 16.50, DEALER: 15.50 },
-        costPrice: 14.00,
-        enabled: true,
-      },
-      // Telecel
-      {
-        network: "TELECEL" as const,
-        name: "Telecel 1GB Daily",
-        volume: "1GB",
-        validity: "1 day",
-        pricing: { USER: 2.30, AGENT: 2.00, DEALER: 1.80 },
-        costPrice: 1.60,
-        enabled: true,
-      },
-      {
-        network: "TELECEL" as const,
-        name: "Telecel 6GB Weekly",
-        volume: "6GB",
-        validity: "7 days",
-        pricing: { USER: 11.00, AGENT: 10.00, DEALER: 9.50 },
-        costPrice: 8.50,
-        enabled: true,
-      },
-      {
-        network: "TELECEL" as const,
-        name: "Telecel 15GB Monthly",
-        volume: "15GB",
-        validity: "30 days",
-        pricing: { USER: 25.00, AGENT: 23.00, DEALER: 21.50 },
-        costPrice: 19.00,
-        enabled: true,
-      },
-    ];
-
-    for (const bundleData of sampleBundles) {
-      try {
-        await createBundle(bundleData);
-        console.log(`✓ Bundle created: ${bundleData.name}`);
-      } catch (error) {
-        console.log(`Bundle may already exist: ${bundleData.name}`);
-      }
-    }
+    console.log("✓ Database seeding complete (Users/Bundles should be added manually via Dashboard)");
 
     // Create sample API providers
     const sampleProviders = [
@@ -657,8 +572,20 @@ serve(async (req) => {
       const transactions = await getByPrefix(`transaction:`);
 
       const userTransactions = transactions
-        .filter((t: any) => t.userId === user.id)
-        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        .filter((t: any) => {
+          if (user.role === "ADMIN") return true; // Admin sees all
+          return String(t.userId).toLowerCase() === String(user.id).toLowerCase();
+        })
+        .sort((a: any, b: any) => {
+          const dateA = new Date(a.createdAt).getTime();
+          const dateB = new Date(b.createdAt).getTime();
+          return (dateB || 0) - (dateA || 0);
+        });
+
+      // Extra logging to debug why user sees "No transactions"
+      if (userTransactions.length === 0 && transactions.length > 0) {
+        console.log(`User ${user.id} has no filtered transactions out of total ${transactions.length}`);
+      }
 
       return json({ success: true, transactions: userTransactions });
     }
@@ -708,7 +635,10 @@ serve(async (req) => {
       const allOrders = await getByPrefix("order:");
 
       const userOrders = (allOrders as any[])
-        .filter(o => o.userId === user.id)
+        .filter(o => {
+          if (user.role === "ADMIN") return true; // Admin sees all
+          return o.userId === user.id;
+        })
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       return json({ success: true, orders: userOrders });
@@ -770,51 +700,32 @@ serve(async (req) => {
 
       await set(`order:${order.id}`, order);
 
-      // Deduct funds from wallet
+      // Process with real provider FIRST
       try {
-        await wallet.deductFunds(
-          user.id,
-          price,
-          `Purchase: ${bundle.name} - ${bundle.volume} to ${phoneNumber}`
-        );
-
-        // Simulate API call to provider
-        // In production, this would call the actual API
-        const success = await simulateDataPurchase(order);
+        const success = await processOrderWithProvider(order);
 
         if (success) {
+          // Deduct funds only if successful
+          await wallet.deductFunds(
+            user.id,
+            price,
+            `Purchase: ${bundle.name} - ${bundle.volume} to ${phoneNumber}`
+          );
+
           order.status = "SUCCESS";
           order.completedAt = new Date().toISOString();
         } else {
-          // Refund if purchase fails
           order.status = "FAILED";
-          order.errorMessage = "Purchase failed - refunding wallet";
+          order.errorMessage = "Provider failed to process data purchase";
           order.completedAt = new Date().toISOString();
-
-          await wallet.addFunds(
-            user.id,
-            price,
-            `Refund: ${bundle.name} - ${bundle.volume} (order failed)`
-          );
         }
       } catch (error) {
-        // Refund on any error
         order.status = "FAILED";
         order.errorMessage = (error as Error).message;
         order.completedAt = new Date().toISOString();
-
-        try {
-          await wallet.addFunds(
-            user.id,
-            price,
-            `Refund: ${bundle.name} - ${bundle.volume} (order failed)`
-          );
-        } catch (refundError) {
-          console.error("Failed to refund:", refundError);
-        }
+        console.error("Order processing error:", error);
       }
-
-      // Update order
+      // Update order status in DB
       await set(`order:${order.id}`, order);
 
       return json({ success: true, order });
@@ -1124,7 +1035,12 @@ serve(async (req) => {
         const user = await getCurrentUser(token);
         if (user.role !== "ADMIN") return json({ error: "Forbidden" }, 403);
 
-        const allOrders = await getByPrefix("order:");
+        const [allOrders, eonbBal, godlyBal] = await Promise.all([
+          getByPrefix("order:"),
+          eonb.checkBalance(),
+          godly.checkBalance()
+        ]);
+
         const success = allOrders.filter(o => o.status === "SUCCESS");
 
         return json({
@@ -1133,7 +1049,8 @@ serve(async (req) => {
             totalOrders: success.length,
             totalVolume: success.reduce((s, o) => s + (o.price || 0), 0),
             totalCost: success.reduce((s, o) => s + (o.costPrice || 0), 0),
-            totalProfit: success.reduce((s, o) => s + (o.profit || 0), 0)
+            totalProfit: success.reduce((s, o) => s + (o.profit || 0), 0),
+            providerBalance: eonbBal.balance + godlyBal.balance
           }
         });
       } catch (err: any) {
