@@ -73,8 +73,10 @@ export interface Order {
 export interface ApiProvider {
   id: string;
   name: string;
+  type: "DATA4UGH" | "GODLYDATA" | "SIMULATED";
   priority: number;
   isActive: boolean;
+  apiKey?: string;
   costPrice?: number; // Cost price for data/airtime
   sellingPrice?: number; // Selling price to customers
   margin?: number; // Profit margin percentage
@@ -282,15 +284,14 @@ class ApiClient {
     );
   }
 
-  async createProvider(name: string, priority: number) {
-    return this.request<{ success: boolean; provider: ApiProvider }>(
-      '/admin/providers',
-      {
-        method: 'POST',
-        body: JSON.stringify({ name, priority }),
-      },
-      true
-    );
+  async createProvider(name: string, type: string, priority: number, apiKey?: string): Promise<{ success: boolean; provider: ApiProvider }> {
+    const response = await fetch(`${API_BASE_URL}/admin/providers`, {
+      method: 'POST',
+      headers: this.getHeaders(true),
+      body: JSON.stringify({ name, type, priority, apiKey }),
+    });
+    if (!response.ok) throw new Error('Failed to create provider');
+    return response.json();
   }
 
   async updateProvider(id: string, updates: Partial<Omit<ApiProvider, 'id' | 'createdAt'>>) {

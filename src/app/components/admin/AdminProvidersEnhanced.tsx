@@ -1,16 +1,21 @@
 import { useState, useEffect } from 'react';
 import { api, ApiProvider } from '../../../lib/api';
-import { Plus, CheckCircle, Edit3, DollarSign, TrendingUp } from 'lucide-react';
+import { Plus, CheckCircle, Edit3, DollarSign, TrendingUp, Key, Shield } from 'lucide-react';
+
+const PROVIDER_TYPES = ["DATA4UGH", "GODLYDATA", "SIMULATED"];
 
 export function AdminProvidersEnhanced() {
   const [providers, setProviders] = useState<ApiProvider[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [name, setName] = useState('');
+  const [type, setType] = useState('DATA4UGH');
   const [priority, setPriority] = useState('1');
+  const [apiKey, setApiKey] = useState('');
   const [costPrice, setCostPrice] = useState('');
   const [sellingPrice, setSellingPrice] = useState('');
   const [editingProvider, setEditingProvider] = useState<ApiProvider | null>(null);
+  const [showKey, setShowKey] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -33,13 +38,9 @@ export function AdminProvidersEnhanced() {
     setError('');
 
     try {
-      await api.createProvider(name, parseInt(priority));
+      await api.createProvider(name, type, parseInt(priority), apiKey);
       await loadProviders();
-      setShowModal(false);
-      setName('');
-      setPriority('1');
-      setCostPrice('');
-      setSellingPrice('');
+      closeModal();
     } catch (err: any) {
       setError(err.message || 'Failed to create provider');
     }
@@ -67,8 +68,8 @@ export function AdminProvidersEnhanced() {
   const handleUpdatePricing = async (id: string, cost: number, selling: number) => {
     try {
       const margin = selling > 0 ? ((selling - cost) / selling) * 100 : 0;
-      await api.updateProvider(id, { 
-        costPrice: cost, 
+      await api.updateProvider(id, {
+        costPrice: cost,
         sellingPrice: selling,
         margin: parseFloat(margin.toFixed(2))
       });
@@ -81,7 +82,9 @@ export function AdminProvidersEnhanced() {
   const handleEditProvider = (provider: ApiProvider) => {
     setEditingProvider(provider);
     setName(provider.name);
+    setType(provider.type || 'DATA4UGH');
     setPriority(provider.priority.toString());
+    setApiKey(provider.apiKey || '');
     setCostPrice(provider.costPrice?.toString() || '');
     setSellingPrice(provider.sellingPrice?.toString() || '');
     setShowModal(true);
@@ -93,7 +96,7 @@ export function AdminProvidersEnhanced() {
   };
 
   const formatCurrency = (amount: number): string => {
-    return amount ? `GHS ${amount.toFixed(2)}` : 'Not set';
+    return amount ? `₵${amount.toFixed(2)}` : 'Not set';
   };
 
   const handleUpdateProvider = async (e: React.FormEvent) => {
@@ -105,24 +108,20 @@ export function AdminProvidersEnhanced() {
     try {
       const updates: any = {
         name,
-        priority: parseInt(priority)
+        type,
+        priority: parseInt(priority),
+        apiKey
       };
 
       if (costPrice) updates.costPrice = parseFloat(costPrice);
       if (sellingPrice) updates.sellingPrice = parseFloat(sellingPrice);
       if (costPrice && sellingPrice) {
-        const margin = calculateMargin(parseFloat(costPrice), parseFloat(sellingPrice));
-        updates.margin = margin;
+        updates.margin = calculateMargin(parseFloat(costPrice), parseFloat(sellingPrice));
       }
 
       await api.updateProvider(editingProvider.id, updates);
       await loadProviders();
-      setShowModal(false);
-      setEditingProvider(null);
-      setName('');
-      setPriority('1');
-      setCostPrice('');
-      setSellingPrice('');
+      closeModal();
     } catch (err: any) {
       setError(err.message || 'Failed to update provider');
     }
@@ -132,36 +131,49 @@ export function AdminProvidersEnhanced() {
     setShowModal(false);
     setEditingProvider(null);
     setName('');
+    setType('DATA4UGH');
     setPriority('1');
+    setApiKey('');
     setCostPrice('');
     setSellingPrice('');
     setError('');
   };
 
+  const maskKey = (key?: string) => {
+    if (!key) return '••••••••';
+    if (showKey === key) return key;
+    return key.substring(0, 4) + '••••' + key.substring(key.length - 4);
+  };
+
   if (isLoading) {
-    return <div className="text-center py-8 text-gray-500">Loading...</div>;
+    return <div className="text-center py-8 text-gray-500 font-medium">Loading Providers...</div>;
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900">API Providers & Pricing</h2>
-          <p className="text-sm text-gray-600 mt-1">Manage external data API providers and pricing</p>
+          <h2 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+            <Shield className="w-6 h-6 text-blue-600" />
+            API Provider Infrastructure
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">Configure external gateways, API keys, and failover priority</p>
         </div>
         <button
           onClick={() => {
             setEditingProvider(null);
             setName('');
+            setType('DATA4UGH');
             setPriority('1');
+            setApiKey('');
             setCostPrice('');
             setSellingPrice('');
             setShowModal(true);
           }}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded font-medium hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-200 hover:scale-[1.02] transition-transform active:scale-[0.98]"
         >
-          <Plus className="w-4 h-4" />
-          Add Provider
+          <Plus className="w-5 h-5" />
+          Add Secure Gateway
         </button>
       </div>
 
@@ -170,164 +182,187 @@ export function AdminProvidersEnhanced() {
           No providers configured yet. Add your first provider to get started.
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Provider</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Priority</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Cost Price</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Selling Price</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Margin</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Status</th>
-                <th className="text-right px-4 py-3 text-sm font-semibold text-gray-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {providers.map((provider) => {
-                const margin = provider.margin || 0;
-                const marginColor = margin >= 10 ? 'text-green-600' : margin >= 5 ? 'text-yellow-600' : 'text-red-600';
-                
-                return (
-                  <tr key={provider.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {provider.isActive && <CheckCircle className="w-4 h-4 text-green-600" />}
-                        <span className={`text-sm font-medium ${provider.isActive ? 'text-green-600' : 'text-gray-900'}`}>
-                          {provider.name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <input
-                        type="number"
-                        value={provider.priority}
-                        onChange={(e) => handleUpdatePriority(provider.id, parseInt(e.target.value))}
-                        className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-900">
-                          {formatCurrency(provider.costPrice || 0)}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 text-green-500" />
-                        <span className="text-sm text-gray-900">
-                          {formatCurrency(provider.sellingPrice || 0)}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <TrendingUp className={`w-4 h-4 ${marginColor}`} />
-                        <span className={`text-sm font-medium ${marginColor}`}>
-                          {margin.toFixed(1)}%
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {provider.isActive ? (
-                        <span className="inline-block px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-700">
-                          ACTIVE
-                        </span>
-                      ) : (
-                        <span className="inline-block px-2 py-1 text-xs font-semibold rounded bg-gray-100 text-gray-600">
-                          INACTIVE
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleEditProvider(provider)}
-                          className="text-sm text-blue-600 hover:underline font-medium"
-                        >
-                          <Edit3 className="w-4 h-4 inline mr-1" />
-                          Edit
-                        </button>
-                        {!provider.isActive && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-gray-50/50 border-b border-gray-100">
+                <tr>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Provider Context</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-center">Priority</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Auth Credentials</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Commercials</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Status</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-right">Operations</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {providers.sort((a, b) => a.priority - b.priority).map((provider) => {
+                  const margin = provider.margin || 0;
+                  const marginColor = margin >= 10 ? 'bg-green-100 text-green-700' : margin >= 5 ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700';
+
+                  return (
+                    <tr key={provider.id} className="hover:bg-blue-50/30 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-gray-900">{provider.name}</span>
+                          <span className="text-[10px] font-black text-blue-600 uppercase tracking-tight">{provider.type || 'LEGACY'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex justify-center">
+                          <span className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-600 border border-gray-200">
+                            {provider.priority}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm font-mono text-gray-400 group">
+                        <div className="flex items-center gap-2">
+                          <Key className="w-3.5 h-3.5" />
+                          <span>{maskKey(provider.apiKey)}</span>
                           <button
-                            onClick={() => handleSetActive(provider.id)}
-                            className="text-sm text-green-600 hover:underline font-medium"
+                            onClick={() => setShowKey(showKey === provider.apiKey ? null : (provider.apiKey || ''))}
+                            className="opacity-0 group-hover:opacity-100 text-blue-500 text-[10px] font-bold"
                           >
-                            Set Active
+                            {showKey === provider.apiKey ? 'HIDE' : 'REVEAL'}
                           </button>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-gray-400">Cost:</span>
+                            <span className="text-sm font-bold text-gray-900">{formatCurrency(provider.costPrice || 0)}</span>
+                          </div>
+                          <div className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${marginColor} w-fit`}>
+                            Margin: {margin.toFixed(1)}%
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {provider.isActive ? (
+                          <div className="flex items-center gap-2 text-green-600 font-bold text-xs uppercase tracking-wider">
+                            <CheckCircle className="w-4 h-4" />
+                            Live
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Standby</span>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            onClick={() => handleEditProvider(provider)}
+                            className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-bold text-sm"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                            Update
+                          </button>
+                          {!provider.isActive && (
+                            <button
+                              onClick={() => handleSetActive(provider.id)}
+                              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-xs font-bold transition-colors"
+                            >
+                              Go Live
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              {editingProvider ? 'Edit Provider' : 'Add API Provider'}
-            </h2>
+        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in zoom-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-white/20">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white">
+              <h2 className="text-2xl font-bold">
+                {editingProvider ? 'Update Configuration' : 'Register API Gateway'}
+              </h2>
+              <p className="text-blue-100 text-sm mt-1">Securely connect Ofilicks to external data providers</p>
+            </div>
 
-            <form onSubmit={editingProvider ? handleUpdateProvider : handleCreate} className="space-y-4">
+            <form onSubmit={editingProvider ? handleUpdateProvider : handleCreate} className="p-8 space-y-6">
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+                <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm flex items-center gap-3">
+                  <span className="w-2 h-2 bg-red-600 rounded-full animate-bounce"></span>
                   {error}
                 </div>
               )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Provider Name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., Hubtel Primary"
-                />
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Internal Recognition Name</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-semibold"
+                    placeholder="e.g., Primary Data4UGH Hub"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-                <input
-                  type="number"
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value)}
-                  required
-                  min="1"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">Lower numbers = higher priority</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Cost Price (GHS)</label>
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Provider Type</label>
+                  <select
+                    value={type}
+                    onChange={(e) => setType(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-semibold"
+                  >
+                    {PROVIDER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Priority Rank</label>
+                  <input
+                    type="number"
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value)}
+                    required
+                    min="1"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-semibold"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Secret API Key</label>
+                  <div className="relative">
+                    <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-mono"
+                      placeholder="sk_live_..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Cost Rate (₵)</label>
                   <input
                     type="number"
                     step="0.01"
                     value={costPrice}
                     onChange={(e) => setCostPrice(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="0.00"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-semibold"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Selling Price (GHS)</label>
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Selling Rate (₵)</label>
                   <input
                     type="number"
                     step="0.01"
                     value={sellingPrice}
                     onChange={(e) => setSellingPrice(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="0.00"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-semibold"
                   />
                 </div>
               </div>
@@ -343,19 +378,19 @@ export function AdminProvidersEnhanced() {
                 </div>
               )}
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-4 pt-4">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded font-medium hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-6 py-4 border border-gray-200 text-gray-600 rounded-2xl font-bold hover:bg-gray-50 transition-colors"
                 >
-                  Cancel
+                  Dismiss
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded font-medium hover:bg-blue-700 transition-colors"
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-2xl font-bold hover:shadow-lg hover:shadow-blue-500/20 active:scale-95 transition-all"
                 >
-                  {editingProvider ? 'Update Provider' : 'Add Provider'}
+                  {editingProvider ? 'Commit Changes' : 'Initialize Gateway'}
                 </button>
               </div>
             </form>

@@ -60,38 +60,65 @@ const del = async (key: string): Promise<void> => {
 // Process order via real provider
 const processOrderWithProvider = async (order: any): Promise<boolean> => {
   try {
-    // Determine provider based on network or availability
-    // Most Ghanaian networks work best with EOnB (Data4UGH)
-    // Godlydata is a great backup.
+    // Get all active providers sorted by priority
+    const allProviders = await getByPrefix("provider:");
+    const activeProviders = (allProviders as any[])
+      .filter(p => p.isActive)
+      .sort((a, b) => a.priority - b.priority);
 
-    // For now, let's use EOnB for everything since keys are provided
-    const res = await eonb.purchaseBundle({
-      network: order.network,
-      recipient: order.phoneNumber,
-      capacity: parseInt(order.volume.replace(/[^0-9]/g, "")) || 1, // Extract GB/MB
-      reference: order.id
-    });
-
-    if (res.success) {
-      console.log(`Provider success for order ${order.id}: ${res.message}`);
-      return true;
+    if (activeProviders.length === 0) {
+      console.error("No active providers configured!");
+      return false;
     }
 
-    // Try fallback to Godlydata if EOnB fails
-    console.warn(`Primary provider (EOnB) failed for ${order.id}, trying Godlydata...`);
-    const resBackup = await godly.purchaseBundle({
-      networkReference: order.network.toLowerCase(),
-      recipientPhone: order.phoneNumber,
-      capacityInGb: parseInt(order.volume.replace(/[^0-9]/g, "")) || 1,
-      orderReference: order.id
-    });
+    for (const provider of activeProviders) {
+      console.log(`Attempting purchase with provider: ${provider.name} (Priority: ${provider.priority})`);
 
-    if (resBackup.success) {
-      console.log(`Backup provider (Godlydata) success for order ${order.id}`);
-      return true;
+      let res: any;
+      const apiKey = provider.apiKey;
+
+      if (!apiKey) {
+        console.warn(`Provider ${provider.name} has no API key configured. Skipping.`);
+        continue;
+      }
+
+      try {
+        if (provider.type === "DATA4UGH") {
+          const p = new Data4UghProvider(apiKey);
+          res = await p.purchaseBundle({
+            network: order.network,
+            recipient: order.phoneNumber,
+            capacity: parseInt(order.volume.replace(/[^0-9]/g, "")) || 1,
+            reference: order.id
+          });
+        } else if (provider.type === "GODLYDATA") {
+          const p = new GodlydataProvider(apiKey);
+          res = await p.purchaseBundle({
+            networkReference: order.network.toLowerCase(),
+            recipientPhone: order.phoneNumber,
+            capacityInGb: parseInt(order.volume.replace(/[^0-9]/g, "")) || 1,
+            orderReference: order.id
+          });
+        } else if (provider.type === "SIMULATED") {
+          console.log(`Simulating success for provider: ${provider.name}`);
+          return true;
+        } else {
+          console.warn(`Unknown provider type: ${provider.type}. Skipping.`);
+          continue;
+        }
+
+        if (res && res.success) {
+          console.log(`Provider ${provider.name} SUCCESS for order ${order.id}: ${res.message}`);
+          return true;
+        } else {
+          console.warn(`Provider ${provider.name} FAILED: ${res?.message || "Unknown error"}`);
+        }
+      } catch (err) {
+        console.error(`Error with provider ${provider.name}:`, err);
+      }
     }
 
-    console.error(`Both providers failed for order ${order.id}: ${resBackup.message}`);
+    console.error(`All providers failed for order ${order.id}`);
     return false;
   } catch (error) {
     console.error(`Integration error for order ${order.id}:`, error);
@@ -202,14 +229,16 @@ interface ApiProvider {
 }
 
 // Create API provider (admin only)
-const createProvider = async (name: string, priority: number) => {
+const createProvider = async (name: string, type: "DATA4UGH" | "GODLYDATA" | "SIMULATED", priority: number, apiKey?: string) => {
   const id = crypto.randomUUID();
 
-  const provider: ApiProvider = {
+  const provider: any = {
     id,
     name,
+    type,
     priority,
     isActive: false,
+    apiKey,
     createdAt: new Date().toISOString()
   };
 
@@ -377,13 +406,19 @@ const seedDatabase = async () => {
 
     // Create sample API providers
     const sampleProviders = [
-      { name: "Primary API", priority: 1 },
-      { name: "Backup API", priority: 2 },
+      { name: "Primary Data4UGH Hub", type: "DATA4UGH", priority: 1, apiKey: "17|EOnB1gYNjudGGuQHDAHD7mfhAhKUE1GT3dDZowWF8d0cf4f0" },
+      { name: "Backup Godlydata", type: "GODLYDATA", priority: 2, apiKey: "7|L85ClQ9Js0isROgsYjRXhmQE6hOuyJryrxBWhNua4ea257e2" },
+      { name: "Simulation Gateway", type: "SIMULATED", priority: 3, apiKey: "sim_key_123" },
     ];
 
     for (const providerData of sampleProviders) {
       try {
-        const provider = await createProvider(providerData.name, providerData.priority);
+        const provider = await createProvider(
+          providerData.name,
+          providerData.type as any,
+          providerData.priority,
+          providerData.apiKey
+        );
 
         // Set the first provider as active
         if (providerData.priority === 1) {
@@ -908,10 +943,10 @@ serve(async (req) => {
       const user = await getCurrentUser(token);
       if (user.role !== "ADMIN") return json({ error: "Forbidden" }, 403);
 
-      const { name, priority } = await req.json();
+      const { name, type, priority, apiKey } = await req.json();
 
-      if (!name || priority === undefined) {
-        return json({ error: "Name and priority required" }, 400);
+      if (!name || !type || priority === undefined) {
+        return json({ error: "Name, type and priority required" }, 400);
       }
 
       const id = crypto.randomUUID();
@@ -919,8 +954,10 @@ serve(async (req) => {
       const provider: any = {
         id,
         name,
+        type,
         priority,
         isActive: false,
+        apiKey,
         createdAt: new Date().toISOString()
       };
 
