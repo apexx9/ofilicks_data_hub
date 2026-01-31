@@ -598,6 +598,44 @@ serve(async (req) => {
       return json({ success: true, wallet: updatedWallet });
     }
 
+    // ============ RESET ENDPOINTS ============
+    if ((pathname === "/admin/reset-bundles" || pathname === "/make-server-c20c3ad2/admin/reset-bundles") && req.method === "POST") {
+      const token = req.headers.get("authorization")?.split(" ")[1];
+      if (!token) return json({ error: "Unauthorized" }, 401);
+
+      const user = await getCurrentUser(token);
+      if (user.role !== "ADMIN") return json({ error: "Forbidden" }, 403);
+
+      const bundles = await getByPrefix("bundle:");
+      for (const b of bundles) {
+        await del(`bundle:${b.id}`);
+      }
+
+      return json({ success: true, message: "All bundles deleted" });
+    }
+
+    if ((pathname === "/admin/reset-all" || pathname === "/make-server-c20c3ad2/admin/reset-all") && req.method === "POST") {
+      const token = req.headers.get("authorization")?.split(" ")[1];
+      if (!token) return json({ error: "Unauthorized" }, 401);
+
+      const user = await getCurrentUser(token);
+      if (user.role !== "ADMIN") return json({ error: "Forbidden" }, 403);
+
+      // Warning: This deletes everything except the admin user potentially if we are not careful
+      // Implementation: Delete bundles, orders, transactions
+
+      const bundles = await getByPrefix("bundle:");
+      for (const b of bundles) await del(`bundle:${b.id}`);
+
+      const orders = await getByPrefix("order:");
+      for (const o of orders) await del(`order:${o.id}`);
+
+      const transactions = await getByPrefix("transaction:");
+      for (const t of transactions) await del(`transaction:${t.id}`);
+
+      return json({ success: true, message: "Database reset (Bundles, Orders, Transactions cleared)" });
+    }
+
     // Transaction endpoints
     if ((pathname === "/transactions" || pathname === "/make-server-c20c3ad2/transactions") && req.method === "GET") {
       const token = req.headers.get("authorization")?.split(" ")[1];

@@ -237,6 +237,16 @@ class ApiClient {
     }, true);
   }
 
+  async resetBundles() {
+    return this.request<{ success: boolean; message: string }>(
+      '/admin/reset-bundles',
+      {
+        method: 'POST',
+      },
+      true
+    );
+  }
+
   // Admin - Users
   async getAllUsers() {
     return this.request<{ success: boolean; users: User[] }>(

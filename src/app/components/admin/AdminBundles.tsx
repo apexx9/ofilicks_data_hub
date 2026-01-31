@@ -131,17 +131,39 @@ export function AdminBundles() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900">Manage Bundles</h2>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowModal(true);
-          }}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded font-medium hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add Bundle
-        </button>
+        <h2 className="text-xl font-semibold text-gray-900">Manage Bundles</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={async () => {
+              if (confirm('Are you sure you want to delete ALL bundles? This cannot be undone.')) {
+                try {
+                  setIsLoading(true);
+                  await api.resetBundles();
+                  await loadBundles();
+                  alert('All bundles have been deleted.');
+                } catch (err: any) {
+                  alert('Failed to reset bundles: ' + err.message);
+                } finally {
+                  setIsLoading(false);
+                }
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+          >
+            <Trash2 className="w-5 h-5" />
+            Reset All
+          </button>
+          <button
+            onClick={() => {
+              resetForm();
+              setShowModal(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            Add Bundle
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
