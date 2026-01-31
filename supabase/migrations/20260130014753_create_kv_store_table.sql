@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS kv_store_c20c3ad2 (
+  key TEXT NOT NULL PRIMARY KEY,
+  value JSONB NOT NULL
+);

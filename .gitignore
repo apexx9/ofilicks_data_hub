@@ -1,0 +1,57 @@
+# =========================
+# Dependencies
+# =========================
+node_modules/
+
+# =========================
+# Build output
+# =========================
+dist/
+dist-ssr/
+
+# =========================
+# Vite cache
+# =========================
+.vite/
+
+# =========================
+# Environment variables
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Logs
+# =========================
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Editor / IDE
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# Testing / coverage
+# =========================
+coverage/
+
+# =========================
+# Optional lockfiles
+# (uncomment if you want to ignore)
+# =========================
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
