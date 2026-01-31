@@ -272,6 +272,11 @@ export default function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/signin" element={<SignIn onSignUpClick={() => window.location.href = '/signup'} />} />
             <Route path="/signup" element={<SignUp onSignInClick={() => window.location.href = '/signin'} />} />
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <AuthenticatedApp />
+              </ProtectedRoute>
+            } />
             <Route path="/payment/callback" element={<PaymentCallback />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
