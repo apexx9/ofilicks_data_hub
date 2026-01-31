@@ -13,13 +13,13 @@ import { AdminUsers } from './components/admin/AdminUsers';
 import { AdminProvidersEnhanced } from './components/admin/AdminProvidersEnhanced';
 import { SeedHelper } from './components/SeedHelper';
 import { PaymentCallback } from './components/PaymentCallback';
-import { 
-  LayoutDashboard, 
-  ShoppingCart, 
-  Wallet, 
-  Receipt, 
-  Package, 
-  Users, 
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  Wallet,
+  Receipt,
+  Package,
+  Users,
   Settings,
   LogOut,
   Menu,
@@ -30,7 +30,7 @@ type Page = 'dashboard' | 'buy-data' | 'transactions' | 'orders' | 'admin-bundle
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
-  
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -41,11 +41,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  
+
   if (!user) {
     return <Navigate to="/signin" replace />;
   }
-  
+
   return <>{children}</>;
 }
 
@@ -104,7 +104,10 @@ function AuthenticatedApp() {
     <div className="min-h-screen bg-gray-50">
       {/* Mobile Header */}
       <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-40">
-        <h1 className="text-lg font-bold text-gray-900">Ofilicks Data Hub</h1>
+        <div className="flex items-center gap-2">
+          <img src="/logo.png" alt="Ofilicks Logo" className="w-8 h-8 object-contain" />
+          <h1 className="text-lg font-bold text-gray-900">Ofilicks Data Hub</h1>
+        </div>
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors"
@@ -115,7 +118,7 @@ function AuthenticatedApp() {
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
           onClick={() => setIsMobileMenuOpen(false)}
         />
@@ -138,11 +141,10 @@ function AuthenticatedApp() {
                 <button
                   key={item.id}
                   onClick={() => setCurrentPage(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
-                    isActive
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${isActive
                       ? 'bg-blue-50 text-blue-600'
                       : 'text-gray-700 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-5 h-5" />
                   {item.label}
@@ -172,9 +174,8 @@ function AuthenticatedApp() {
 
         {/* Sidebar - Mobile */}
         <aside
-          className={`lg:hidden fixed top-0 left-0 w-64 bg-white border-r border-gray-200 h-full z-50 transition-transform duration-300 ${
-            isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
+          className={`lg:hidden fixed top-0 left-0 w-64 bg-white border-r border-gray-200 h-full z-50 transition-transform duration-300 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+            }`}
         >
           <div className="p-6 border-b border-gray-200">
             <h1 className="text-xl font-bold text-gray-900">Ofilicks Data Hub</h1>
@@ -193,11 +194,10 @@ function AuthenticatedApp() {
                     setCurrentPage(item.id);
                     setIsMobileMenuOpen(false);
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
-                    isActive
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${isActive
                       ? 'bg-blue-50 text-blue-600'
                       : 'text-gray-700 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-5 h-5" />
                   {item.label}
@@ -244,11 +244,10 @@ function AuthenticatedApp() {
                 <button
                   key={item.id}
                   onClick={() => setCurrentPage(item.id)}
-                  className={`flex flex-col items-center gap-1 py-2 px-3 rounded-lg transition-colors ${
-                    isActive
+                  className={`flex flex-col items-center gap-1 py-2 px-3 rounded-lg transition-colors ${isActive
                       ? 'bg-blue-50 text-blue-600'
                       : 'text-gray-600 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-5 h-5" />
                   <span className="text-xs font-medium">{item.label}</span>

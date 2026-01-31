@@ -313,6 +313,30 @@ class ApiClient {
       true
     );
   }
+
+  // Admin - Revenue
+  async getRevenue() {
+    return this.request<{
+      success: boolean;
+      stats: {
+        totalOrders: number;
+        totalVolume: number;
+        totalCost: number;
+        totalProfit: number;
+      }
+    }>('/admin/revenue', {}, true);
+  }
+
+  async withdraw(amount: number, recipientCode: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      withdrawal: any;
+    }>('/admin/withdraw', {
+      method: 'POST',
+      body: JSON.stringify({ amount, recipientCode }),
+    }, true);
+  }
 }
 
 export const api = new ApiClient();

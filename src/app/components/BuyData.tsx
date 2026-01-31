@@ -45,13 +45,13 @@ export function BuyData() {
 
     try {
       const price = selectedBundle.pricing[user.role];
-      
+
       if (wallet && wallet.balance < price) {
         throw new Error('Insufficient wallet balance. Please add funds first.');
       }
 
       const { order } = await api.createOrder(selectedBundle.id, phoneNumber);
-      
+
       if (order.status === 'SUCCESS') {
         setSuccess(`Successfully purchased ${selectedBundle.name} for ${phoneNumber}`);
         setSelectedBundle(null);
@@ -69,7 +69,7 @@ export function BuyData() {
 
   const getPriceForUser = (bundle: Bundle) => {
     if (!user) return bundle.pricing.USER;
-    return bundle.pricing[user.role];
+    return bundle.pricing[user.role as keyof typeof bundle.pricing] || bundle.pricing.USER;
   };
 
   // Group bundles by network
@@ -97,7 +97,7 @@ export function BuyData() {
 
       {Object.entries(bundlesByNetwork).map(([network, networkBundles]) => {
         const label = NetworkLabels[network as Network];
-        
+
         return (
           <div key={network} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div className={`${label.color} p-4`}>
@@ -133,7 +133,7 @@ export function BuyData() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Purchase Bundle</h2>
-            
+
             <div className="bg-gray-50 rounded-lg p-4 mb-6">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-gray-600">Bundle</span>

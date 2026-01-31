@@ -1077,132 +1077,90 @@ serve(async (req) => {
     }
 
     // ============ PAYMENT ENDPOINTS ============
-
-    // Handle Paystack webhook
     if (pathname === "/webhook/paystack" && req.method === "POST") {
       try {
         const signature = req.headers.get("x-paystack-signature");
         const payload = await req.text();
-
-        // Verify webhook signature
         const secret = Deno.env.get("PAYSTACK_WEBHOOK_SECRET") || "test_secret";
         if (!(await verifyWebhookSignature(payload, signature || "", secret))) {
           return json({ error: "Invalid webhook signature" }, 401);
         }
-
-        const data = JSON.parse(payload);
-        await handlePaymentWebhook(data);
-
+        await handlePaymentWebhook(JSON.parse(payload));
         return json({ success: true });
-      } catch (error) {
-        console.error("Webhook error:", error);
-        return json({ error: error.message }, 500);
+      } catch (err: any) {
+        return json({ error: err.message }, 500);
       }
     }
 
-    // Get user payment history
     if (pathname === "/payments" && req.method === "GET") {
       try {
         const token = req.headers.get("authorization")?.split(" ")[1];
         if (!token) return json({ error: "Unauthorized" }, 401);
-
         const user = await getCurrentUser(token);
         const payments = await getUserPayments(user.id);
-
         return json({ success: true, payments });
-      } catch (error) {
-        return json({ error: error.message }, 500);
+      } catch (err: any) {
+        return json({ error: err.message }, 500);
       }
     }
 
-    // Admin: Get all payments
     if (pathname === "/admin/payments" && req.method === "GET") {
       try {
         const token = req.headers.get("authorization")?.split(" ")[1];
         if (!token) return json({ error: "Unauthorized" }, 401);
-
         const user = await getCurrentUser(token);
         if (user.role !== "ADMIN") return json({ error: "Forbidden" }, 403);
-
         const payments = await getAllPayments();
         return json({ success: true, payments });
-      } catch (error) {
-        return json({ error: error.message }, 500);
+      } catch (err: any) {
+        return json({ error: err.message }, 500);
       }
     }
 
-    // Admin: Get Revenue/Profit Stats
     if ((pathname === "/admin/revenue" || pathname === "/make-server-c20c3ad2/admin/revenue") && req.method === "GET") {
       try {
         const token = req.headers.get("authorization")?.split(" ")[1];
         if (!token) return json({ error: "Unauthorized" }, 401);
-
         const user = await getCurrentUser(token);
         if (user.role !== "ADMIN") return json({ error: "Forbidden" }, 403);
 
         const allOrders = await getByPrefix("order:");
-        const successfulOrders = allOrders.filter(o => o.status === "SUCCESS");
-
-        const totalVolume = successfulOrders.reduce((sum, o) => sum + (o.price || 0), 0);
-        const totalCost = successfulOrders.reduce((sum, o) => sum + (o.costPrice || 0), 0);
-        const totalProfit = successfulOrders.reduce((sum, o) => sum + (o.profit || 0), 0);
+        const success = allOrders.filter(o => o.status === "SUCCESS");
 
         return json({
           success: true,
           stats: {
-            totalOrders: successfulOrders.length,
-            totalVolume,
-            totalCost,
-            totalProfit
+            totalOrders: success.length,
+            totalVolume: success.reduce((s, o) => s + (o.price || 0), 0),
+            totalCost: success.reduce((s, o) => s + (o.costPrice || 0), 0),
+            totalProfit: success.reduce((s, o) => s + (o.profit || 0), 0)
           }
         });
-      } catch (error) {
-        return json({ error: error.message }, 500);
+      } catch (err: any) {
+        return json({ error: err.message }, 500);
       }
     }
 
-    // Admin: Initiate Withdrawal
     if ((pathname === "/admin/withdraw" || pathname === "/make-server-c20c3ad2/admin/withdraw") && req.method === "POST") {
       try {
         const token = req.headers.get("authorization")?.split(" ")[1];
         if (!token) return json({ error: "Unauthorized" }, 401);
-
         const user = await getCurrentUser(token);
         if (user.role !== "ADMIN") return json({ error: "Forbidden" }, 403);
-
         const { amount, recipientCode } = await req.json();
-
-        // This is where you would call initiatePaystackTransfer from payments.ts
-        // For now, we will simulate a success but keep the reference for future implementation
-        console.log(`[Admin Withdrawal] Amount: ${amount}, Recipient: ${recipientCode}`);
-
         return json({
           success: true,
-          message: "Withdrawal initiated successfully (simulated)",
-          withdrawal: {
-            amount,
-            recipientCode,
-            status: "PENDING",
-            createdAt: new Date().toISOString()
-          }
+          message: "Withdrawal simulated",
+          withdrawal: { amount, recipientCode, status: "PENDING", createdAt: new Date().toISOString() }
         });
-      } catch (error) {
-        return json({ error: error.message }, 500);
+      } catch (err: any) {
+        return json({ error: err.message }, 500);
       }
     }
 
-    const payments = await getAllPayments();
-
-    return json({ success: true, payments });
-  } catch (error) {
-    return json({ error: error.message }, 500);
-  }
-}
-
     return json({ error: "Not found" }, 404);
-
-  } catch (err) {
-  console.error("Edge Function error:", err);
-  return json({ error: err.message }, 500);
-}
+  } catch (err: any) {
+    console.error("Edge Function error:", err);
+    return json({ error: err.message }, 500);
+  }
 });
