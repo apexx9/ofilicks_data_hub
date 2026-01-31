@@ -13,20 +13,9 @@ import { api, Bundle, Network } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 
 
-/* ---------------- MOCK FETCH ----------------
-Replace this with your real API later.
--------------------------------------------- */
-const fetchBundles = async (): Promise<Bundle[]> => {
-  return [
-    { id: "1", network: "MTN", size: "1GB", price: 5 },
-    { id: "2", network: "MTN", size: "5GB", price: 20 },
-    { id: "3", network: "AirtelTigo", size: "2GB", price: 10 },
-    { id: "4", network: "Telecel", size: "3GB", price: 15 },
-    { id: "5", network: "MTN", size: "10GB", price: 35 },
-    { id: "6", network: "AirtelTigo", size: "5GB", price: 25 },
-    { id: "7", network: "Telecel", size: "8GB", price: 30 },
-    { id: "8", network: "MTN", size: "20GB", price: 60 },
-  ];
+// Utility to format network names
+const formatNetwork = (network: string) => {
+  return network.replace('AIRTELTIGO_', 'AT ').replace('_', ' ');
 };
 
 export function LandingPage() {

@@ -13,6 +13,7 @@ import { AdminUsers } from './components/admin/AdminUsers';
 import { AdminProvidersEnhanced } from './components/admin/AdminProvidersEnhanced';
 import { SeedHelper } from './components/SeedHelper';
 import { PaymentCallback } from './components/PaymentCallback';
+import { NotFound } from './components/NotFound';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -142,8 +143,8 @@ function AuthenticatedApp() {
                   key={item.id}
                   onClick={() => setCurrentPage(item.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${isActive
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-gray-700 hover:bg-gray-50'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-700 hover:bg-gray-50'
                     }`}
                 >
                   <Icon className="w-5 h-5" />
@@ -195,8 +196,8 @@ function AuthenticatedApp() {
                     setIsMobileMenuOpen(false);
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${isActive
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-gray-700 hover:bg-gray-50'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-700 hover:bg-gray-50'
                     }`}
                 >
                   <Icon className="w-5 h-5" />
@@ -245,8 +246,8 @@ function AuthenticatedApp() {
                   key={item.id}
                   onClick={() => setCurrentPage(item.id)}
                   className={`flex flex-col items-center gap-1 py-2 px-3 rounded-lg transition-colors ${isActive
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-gray-600 hover:bg-gray-50'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-600 hover:bg-gray-50'
                     }`}
                 >
                   <Icon className="w-5 h-5" />
@@ -272,11 +273,7 @@ export default function App() {
             <Route path="/signin" element={<SignIn onSignUpClick={() => window.location.href = '/signup'} />} />
             <Route path="/signup" element={<SignUp onSignInClick={() => window.location.href = '/signin'} />} />
             <Route path="/payment/callback" element={<PaymentCallback />} />
-            <Route path="/*" element={
-              <ProtectedRoute>
-                <AuthenticatedApp />
-              </ProtectedRoute>
-            } />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
       </>
