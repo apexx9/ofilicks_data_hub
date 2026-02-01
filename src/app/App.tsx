@@ -1,19 +1,18 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
-import { LandingPage } from './components/LandingPage';
-import { SignIn } from './components/SignIn';
-import { SignUp } from './components/SignUp';
-import { Dashboard } from './components/Dashboard';
-import { BuyData } from './components/BuyData';
-import { TransactionHistory } from './components/TransactionHistory';
-import { OrderHistory } from './components/OrderHistory';
-import { AdminBundles } from './components/admin/AdminBundles';
-import { AdminUsers } from './components/admin/AdminUsers';
-import { AdminProvidersEnhanced } from './components/admin/AdminProvidersEnhanced';
-import { SeedHelper } from './components/SeedHelper';
-import { PaymentCallback } from './components/PaymentCallback';
-import { NotFound } from './components/NotFound';
+import { LandingPage } from '../features/landing/LandingPage';
+import { SignIn } from '../features/auth/SignIn';
+import { SignUp } from '../features/auth/SignUp';
+import { Dashboard } from '../features/dashboard/Dashboard';
+import { BuyData } from '../features/dashboard/BuyData';
+import { TransactionHistory } from '../features/payment/TransactionHistory';
+import { OrderHistory } from '../features/dashboard/OrderHistory';
+import { AdminBundles } from '../features/admin/AdminBundles';
+import { AdminUsers } from '../features/admin/AdminUsers';
+import { AdminProvidersEnhanced } from '../features/admin/AdminProvidersEnhanced';
+import { PaymentCallback } from '../features/payment/PaymentCallback';
+import { NotFound } from '../features/landing/NotFound';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -266,7 +265,6 @@ export default function App() {
   return (
     <Router>
       <>
-        <SeedHelper />
         <AuthProvider>
           <Routes>
             <Route path="/" element={<LandingPage />} />

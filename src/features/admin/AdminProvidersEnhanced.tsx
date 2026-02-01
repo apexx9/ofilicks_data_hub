@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api, ApiProvider } from '@/lib/api';
-import { Plus, CheckCircle, Edit3, DollarSign, TrendingUp, Key, Shield } from 'lucide-react';
+import { Plus, CheckCircle, Edit3, TrendingUp, Key, Shield, RefreshCw, Power } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 const PROVIDER_TYPES = ["DATA4UGH", "GODLYDATA", "SIMULATED"];
 
@@ -23,6 +24,7 @@ export function AdminProvidersEnhanced() {
   }, []);
 
   const loadProviders = async () => {
+    setIsLoading(true);
     try {
       const { providers: data } = await api.getAllProviders();
       setProviders(data);
@@ -46,36 +48,15 @@ export function AdminProvidersEnhanced() {
     }
   };
 
-  const handleSetActive = async (id: string) => {
+  const handleSetActive = async (id: string, currentStatus: boolean) => {
+    // Note: API might only have 'setActiveProvider' which implies setting it as THE active one, 
+    // or toggling. Assuming 'setActiveProvider' makes it the active one for its type/priority logic.
     try {
       await api.setActiveProvider(id);
       await loadProviders();
     } catch (error) {
       console.error('Failed to set active provider:', error);
       alert('Failed to set active provider');
-    }
-  };
-
-  const handleUpdatePriority = async (id: string, newPriority: number) => {
-    try {
-      await api.updateProvider(id, { priority: newPriority });
-      await loadProviders();
-    } catch (error) {
-      console.error('Failed to update priority:', error);
-    }
-  };
-
-  const handleUpdatePricing = async (id: string, cost: number, selling: number) => {
-    try {
-      const margin = selling > 0 ? ((selling - cost) / selling) * 100 : 0;
-      await api.updateProvider(id, {
-        costPrice: cost,
-        sellingPrice: selling,
-        margin: parseFloat(margin.toFixed(2))
-      });
-      await loadProviders();
-    } catch (error) {
-      console.error('Failed to update pricing:', error);
     }
   };
 
@@ -146,12 +127,17 @@ export function AdminProvidersEnhanced() {
   };
 
   if (isLoading) {
-    return <div className="text-center py-8 text-gray-500 font-medium">Loading Providers...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-gray-500">
+        <RefreshCw className="w-10 h-10 animate-spin mb-4 text-blue-500/50" />
+        <p className="font-medium">Loading Gateway Configurations...</p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
             <Shield className="w-6 h-6 text-blue-600" />
@@ -170,7 +156,7 @@ export function AdminProvidersEnhanced() {
             setSellingPrice('');
             setShowModal(true);
           }}
-          className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-200 hover:scale-[1.02] transition-transform active:scale-[0.98]"
+          className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-200 hover:scale-[1.02] transition-transform active:scale-[0.98]"
         >
           <Plus className="w-5 h-5" />
           Add Secure Gateway
@@ -178,8 +164,12 @@ export function AdminProvidersEnhanced() {
       </div>
 
       {providers.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
-          No providers configured yet. Add your first provider to get started.
+        <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center text-gray-500 flex flex-col items-center">
+          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+            <Shield className="w-8 h-8 text-blue-200" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-1">No Providers Configured</h3>
+          <p className="text-sm text-gray-400">Add your first data provider gateway to start processing orders.</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -196,80 +186,89 @@ export function AdminProvidersEnhanced() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {providers.sort((a, b) => a.priority - b.priority).map((provider) => {
-                  const margin = provider.margin || 0;
-                  const marginColor = margin >= 10 ? 'bg-green-100 text-green-700' : margin >= 5 ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700';
+                <AnimatePresence>
+                  {providers.sort((a, b) => a.priority - b.priority).map((provider) => {
+                    const margin = provider.margin || 0;
+                    const marginColor = margin >= 10 ? 'bg-green-100 text-green-700' : margin >= 5 ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700';
 
-                  return (
-                    <tr key={provider.id} className="hover:bg-blue-50/30 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-bold text-gray-900">{provider.name}</span>
-                          <span className="text-[10px] font-black text-blue-600 uppercase tracking-tight">{provider.type || 'LEGACY'}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex justify-center">
-                          <span className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-600 border border-gray-200">
-                            {provider.priority}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm font-mono text-gray-400 group">
-                        <div className="flex items-center gap-2">
-                          <Key className="w-3.5 h-3.5" />
-                          <span>{maskKey(provider.apiKey)}</span>
-                          <button
-                            onClick={() => setShowKey(showKey === provider.apiKey ? null : (provider.apiKey || ''))}
-                            className="opacity-0 group-hover:opacity-100 text-blue-500 text-[10px] font-bold"
-                          >
-                            {showKey === provider.apiKey ? 'HIDE' : 'REVEAL'}
-                          </button>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-gray-400">Cost:</span>
-                            <span className="text-sm font-bold text-gray-900">{formatCurrency(provider.costPrice || 0)}</span>
+                    return (
+                      <motion.tr
+                        key={provider.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        layout
+                        className="bg-white hover:bg-blue-50/30 transition-colors"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-gray-900">{provider.name}</span>
+                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-tight">{provider.type || 'LEGACY'}</span>
                           </div>
-                          <div className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${marginColor} w-fit`}>
-                            Margin: {margin.toFixed(1)}%
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex justify-center">
+                            <span className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-600 border border-gray-200">
+                              {provider.priority}
+                            </span>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {provider.isActive ? (
-                          <div className="flex items-center gap-2 text-green-600 font-bold text-xs uppercase tracking-wider">
-                            <CheckCircle className="w-4 h-4" />
-                            Live
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Standby</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-3">
-                          <button
-                            onClick={() => handleEditProvider(provider)}
-                            className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-bold text-sm"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                            Update
-                          </button>
-                          {!provider.isActive && (
+                        </td>
+                        <td className="px-6 py-4 text-sm font-mono text-gray-400 group">
+                          <div className="flex items-center gap-2">
+                            <Key className="w-3.5 h-3.5" />
+                            <span className="text-gray-600">{maskKey(provider.apiKey)}</span>
                             <button
-                              onClick={() => handleSetActive(provider.id)}
-                              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-xs font-bold transition-colors"
+                              onClick={() => setShowKey(showKey === provider.apiKey ? null : (provider.apiKey || ''))}
+                              className="opacity-0 group-hover:opacity-100 text-blue-600 text-[10px] font-bold uppercase tracking-wider hover:underline"
                             >
-                              Go Live
+                              {showKey === provider.apiKey ? 'HIDE' : 'SHOW'}
                             </button>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-gray-400">Cost:</span>
+                              <span className="text-sm font-bold text-gray-900">{formatCurrency(provider.costPrice || 0)}</span>
+                            </div>
+                            <div className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${marginColor} w-fit`}>
+                              {margin.toFixed(1)}% Margin
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {provider.isActive ? (
+                            <div className="flex items-center gap-1.5 text-green-600 font-bold text-xs uppercase tracking-wider bg-green-50 px-2 py-1 rounded w-fit">
+                              <CheckCircle className="w-3.5 h-3.5" />
+                              Active
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-xs font-bold uppercase tracking-wider bg-gray-100 px-2 py-1 rounded w-fit">Standby</span>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleEditProvider(provider)}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            {!provider.isActive && (
+                              <button
+                                onClick={() => handleSetActive(provider.id, provider.isActive)}
+                                className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                title="Set Active"
+                              >
+                                <Power className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </AnimatePresence>
               </tbody>
             </table>
           </div>

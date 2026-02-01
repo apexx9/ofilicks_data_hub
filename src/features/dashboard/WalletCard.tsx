@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { PaymentForm } from './PaymentForm';
+import { PaymentForm } from '../payment/PaymentForm';
 import { Wallet as WalletIcon, CreditCard } from 'lucide-react';
 
 export function WalletCard() {
@@ -14,7 +14,7 @@ export function WalletCard() {
           <WalletIcon className="w-5 h-5" />
           <span className="text-sm font-medium opacity-90">Wallet Balance</span>
         </div>
-        
+
         <div className="mb-6">
           <div className="text-3xl font-bold">
             GHS {wallet?.balance.toFixed(2) || '0.00'}
@@ -42,8 +42,8 @@ export function WalletCard() {
                 ✕
               </button>
             </div>
-            
-            <PaymentForm 
+
+            <PaymentForm
               onSuccess={() => {
                 setShowFundModal(false);
                 refreshWallet();

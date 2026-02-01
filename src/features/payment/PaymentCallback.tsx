@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { processSuccessfulPayment } from '../../lib/payments';
-import { useAuth } from '../../contexts/AuthContext';
+import { processSuccessfulPayment } from '@/lib/payments';
+import { useAuth } from '@/contexts/AuthContext';
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
 
 export function PaymentCallback() {
@@ -35,23 +35,23 @@ export function PaymentCallback() {
 
         // Process the successful payment
         const result = await processSuccessfulPayment(paymentReference, user.id);
-        
+
         setStatus('success');
         setMessage(result.message);
-        
+
         // Refresh wallet balance
         await refreshWallet();
-        
+
         // Redirect to dashboard after 3 seconds
         setTimeout(() => {
           navigate('/dashboard');
         }, 3000);
-        
+
       } catch (error: any) {
         console.error('Payment callback error:', error);
         setStatus('failed');
         setMessage(error.message || 'Payment processing failed');
-        
+
         // Redirect to dashboard after 5 seconds
         setTimeout(() => {
           navigate('/dashboard');
@@ -72,7 +72,7 @@ export function PaymentCallback() {
             <p className="text-gray-600">Please wait while we verify your payment...</p>
           </div>
         );
-      
+
       case 'success':
         return (
           <div className="text-center">
@@ -82,7 +82,7 @@ export function PaymentCallback() {
             <p className="text-sm text-gray-500">Redirecting to dashboard...</p>
           </div>
         );
-      
+
       case 'failed':
         return (
           <div className="text-center">
