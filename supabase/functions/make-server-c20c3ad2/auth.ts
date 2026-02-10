@@ -1,5 +1,4 @@
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
-import * as kv from "./kv_store.ts";
 
 const supabaseAdmin = () => createClient(
   Deno.env.get("SUPABASE_URL"),
@@ -21,10 +20,10 @@ export interface User {
   createdAt: string;
 }
 
-// Sign up a new user
+// Sign up a new user using database
 export async function signup(email: string, password: string, name: string, role: UserRole = "USER") {
   const supabase = supabaseAdmin();
-  
+
   // Create the auth user
   // Automatically confirm the user's email since an email server hasn't been configured.
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -40,31 +39,16 @@ export async function signup(email: string, password: string, name: string, role
 
   const userId = authData.user.id;
 
-  // Store user details in KV store
-  const user: User = {
-    id: userId,
-    email,
-    name,
-    role,
-    createdAt: new Date().toISOString()
-  };
+  // The user profile and wallet will be automatically created by the database trigger
+  // from the migration we created
 
-  await kv.set(`user:${userId}`, user);
-
-  // Initialize wallet with 0 balance
-  await kv.set(`wallet:${userId}`, {
-    userId,
-    balance: 0,
-    createdAt: new Date().toISOString()
-  });
-
-  return { user, userId };
+  return { user: { id: userId, email, name, role, createdAt: new Date().toISOString() }, userId };
 }
 
-// Sign in
+// Sign in using Supabase Auth
 export async function signin(email: string, password: string) {
   const supabase = supabaseClient();
-  
+
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password
@@ -83,45 +67,98 @@ export async function signin(email: string, password: string) {
 // Get current user from access token
 export async function getCurrentUser(accessToken: string) {
   const supabase = supabaseAdmin();
-  
+
   const { data: { user }, error } = await supabase.auth.getUser(accessToken);
-  
+
   if (error || !user) {
     throw new Error("Unauthorized");
   }
 
-  // Get user details from KV store
-  const userData = await kv.get(`user:${user.id}`);
-  
-  if (!userData) {
-    throw new Error("User data not found");
+  // Get user profile from database
+  const { data: profile, error: profileError } = await supabase
+    .from("user_profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile) {
+    throw new Error("User profile not found");
   }
 
-  return userData as User;
+  return {
+    id: profile.id,
+    email: profile.email,
+    name: profile.name,
+    role: profile.role,
+    createdAt: profile.created_at,
+  } as User;
 }
 
 // Get user by ID
 export async function getUserById(userId: string) {
-  const userData = await kv.get(`user:${userId}`);
-  return userData as User | null;
+  const supabase = supabaseAdmin();
+
+  const { data: profile, error } = await supabase
+    .from("user_profiles")
+    .select("*")
+    .eq("id", userId)
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to get user: ${error.message}`);
+  }
+
+  return {
+    id: profile.id,
+    email: profile.email,
+    name: profile.name,
+    role: profile.role,
+    createdAt: profile.created_at,
+  } as User;
 }
 
 // Update user role (admin only)
 export async function updateUserRole(userId: string, role: UserRole) {
-  const userData = await kv.get(`user:${userId}`);
-  
-  if (!userData) {
-    throw new Error("User not found");
+  const supabase = supabaseAdmin();
+
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .update({ role, updated_at: new Date().toISOString() })
+    .eq("id", userId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update user role: ${error.message}`);
   }
 
-  const updatedUser = { ...userData, role };
-  await kv.set(`user:${userId}`, updatedUser);
-  
-  return updatedUser;
+  return {
+    id: data.id,
+    email: data.email,
+    name: data.name,
+    role: data.role,
+    createdAt: data.created_at,
+  } as User;
 }
 
 // Get all users (admin only)
 export async function getAllUsers() {
-  const users = await kv.getByPrefix("user:");
-  return users as User[];
+  const supabase = supabaseAdmin();
+
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to get users: ${error.message}`);
+  }
+
+  return data.map(profile => ({
+    id: profile.id,
+    email: profile.email,
+    name: profile.name,
+    role: profile.role,
+    createdAt: profile.created_at,
+  })) as User[];
 }

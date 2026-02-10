@@ -1,104 +1,147 @@
-import * as kv from "./kv_store.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
+
+const client = () => createClient(
+  Deno.env.get("SUPABASE_URL"),
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+);
 
 export interface Wallet {
+  id: string;
   userId: string;
   balance: number;
+  version: number;
   createdAt: string;
-  updatedAt?: string;
+  updatedAt: string;
 }
 
 export interface Transaction {
   id: string;
   userId: string;
+  walletId: string;
   type: "CREDIT" | "DEBIT";
   amount: number;
   balance: number;
   description: string;
+  reference?: string;
+  orderId?: string;
   createdAt: string;
 }
 
-// Get wallet balance
+// Get wallet balance from database
 export async function getWallet(userId: string): Promise<Wallet> {
-  const wallet = await kv.get(`wallet:${userId}`);
+  const supabase = client();
 
-  if (!wallet) {
+  const { data, error } = await supabase
+    .from("wallets")
+    .select("*")
+    .eq("user_id", userId)
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to get wallet: ${error.message}`);
+  }
+
+  if (!data) {
     throw new Error("Wallet not found");
   }
 
-  return wallet as Wallet;
+  return {
+    id: data.id,
+    userId: data.user_id,
+    balance: parseFloat(data.balance),
+    version: data.version,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  };
 }
 
-// Add funds to wallet
-export async function addFunds(userId: string, amount: number, description: string = "Wallet funding") {
+// Add funds to wallet using atomic database function
+export async function addFunds(
+  userId: string,
+  amount: number,
+  description: string = "Wallet funding",
+  reference?: string,
+  expectedVersion?: number
+) {
   if (amount <= 0) {
     throw new Error("Amount must be positive");
   }
 
-  const wallet = await getWallet(userId);
-  const newBalance = wallet.balance + amount;
+  const supabase = client();
 
-  // Update wallet
-  const updatedWallet = {
-    ...wallet,
-    balance: newBalance,
-    updatedAt: new Date().toISOString()
-  };
+  // Use the atomic database function
+  const { data, error } = await supabase.rpc("update_wallet_balance", {
+    p_user_id: userId,
+    p_amount: amount,
+    p_description: description,
+    p_reference: reference,
+    p_expected_version: expectedVersion,
+  });
 
-  await kv.set(`wallet:${userId}`, updatedWallet);
+  if (error) {
+    throw new Error(`Failed to add funds: ${error.message}`);
+  }
 
-  // Create transaction record
-  const transaction: Transaction = {
-    id: crypto.randomUUID(),
-    userId,
-    type: "CREDIT",
-    amount,
-    balance: newBalance,
-    description,
-    createdAt: new Date().toISOString()
-  };
-
-  await kv.set(`transaction:${transaction.id}`, transaction);
-
-  return { wallet: updatedWallet, transaction };
+  return data;
 }
 
-// Deduct funds from wallet
-export async function deductFunds(userId: string, amount: number, description: string) {
+// Deduct funds from wallet using atomic database function
+export async function deductFunds(
+  userId: string,
+  amount: number,
+  description: string,
+  reference?: string,
+  expectedVersion?: number
+) {
   if (amount <= 0) {
     throw new Error("Amount must be positive");
   }
 
-  const wallet = await getWallet(userId);
+  const supabase = client();
 
-  if (wallet.balance < amount) {
-    throw new Error("Insufficient balance");
+  // Use the atomic database function (negative amount for deduction)
+  const { data, error } = await supabase.rpc("update_wallet_balance", {
+    p_user_id: userId,
+    p_amount: -amount,
+    p_description: description,
+    p_reference: reference,
+    p_expected_version: expectedVersion,
+  });
+
+  if (error) {
+    throw new Error(`Failed to deduct funds: ${error.message}`);
   }
 
-  const newBalance = wallet.balance - amount;
+  return data;
+}
 
-  // Update wallet
-  const updatedWallet = {
-    ...wallet,
-    balance: newBalance,
-    updatedAt: new Date().toISOString()
-  };
+// Get user transactions from database
+export async function getUserTransactions(userId: string, limit: number = 50): Promise<Transaction[]> {
+  const supabase = client();
 
-  await kv.set(`wallet:${userId}`, updatedWallet);
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
 
-  // Create transaction record
-  const transaction: Transaction = {
-    id: crypto.randomUUID(),
-    userId,
-    type: "DEBIT",
-    amount,
-    balance: newBalance,
-    description,
-    createdAt: new Date().toISOString()
-  };
+  if (error) {
+    throw new Error(`Failed to get transactions: ${error.message}`);
+  }
 
-  await kv.set(`transaction:${transaction.id}`, transaction);
-
-  return { wallet: updatedWallet, transaction };
+  return (data || []).map(tx => ({
+    id: tx.id,
+    userId: tx.user_id,
+    walletId: tx.wallet_id,
+    type: tx.type,
+    amount: parseFloat(tx.amount),
+    balance: parseFloat(tx.balance),
+    description: tx.description,
+    reference: tx.reference,
+    orderId: tx.order_id,
+    createdAt: tx.created_at,
+  }));
 }
 
 // Get transaction history

@@ -1,10 +1,15 @@
-import * as kv from "./kv_store.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 import * as wallet from "./wallet.ts";
 import * as bundles from "./bundles.ts";
 import type { UserRole } from "./auth.ts";
 import type { Network } from "./bundles.ts";
 
-export type OrderStatus = "PENDING" | "SUCCESS" | "FAILED";
+const client = () => createClient(
+  Deno.env.get("SUPABASE_URL"),
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+);
+
+export type OrderStatus = "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "REFUNDED";
 
 export interface Order {
   id: string;
@@ -16,103 +21,129 @@ export interface Order {
   phoneNumber: string;
   price: number;
   status: OrderStatus;
+  transactionId?: string;
+  apiProviderId?: string;
+  externalReference?: string;
+  errorMessage?: string;
   createdAt: string;
   completedAt?: string;
-  errorMessage?: string;
 }
 
-// Create order and process purchase
+export interface ApiProvider {
+  id: string;
+  name: string;
+  priority: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// Create order and process purchase using atomic database function
 export async function createOrder(
   userId: string,
   userRole: UserRole,
   bundleId: string,
   phoneNumber: string
 ) {
-  // Get bundle
-  const bundle = await bundles.getBundleById(bundleId);
-  
-  if (!bundle) {
-    throw new Error("Bundle not found");
+  const supabase = client();
+
+  // Use the atomic database function for order processing
+  const { data, error } = await supabase.rpc("process_bundle_order", {
+    p_user_id: userId,
+    p_bundle_id: bundleId,
+    p_phone_number: phoneNumber,
+  });
+
+  if (error) {
+    throw new Error(`Failed to create order: ${error.message}`);
   }
 
-  if (!bundle.enabled) {
-    throw new Error("Bundle is currently disabled");
+  // Get the created order details
+  const orderId = data.order_id;
+  const { data: orderData, error: orderError } = await supabase
+    .from("orders")
+    .select(`
+      *,
+      bundles:bundle_id (
+        id,
+        name,
+        network,
+        volume
+      )
+    `)
+    .eq("id", orderId)
+    .single();
+
+  if (orderError) {
+    throw new Error(`Failed to retrieve order: ${orderError.message}`);
   }
 
-  // Get price for user role
-  const price = bundles.getPriceForRole(bundle, userRole);
-
-  // Check wallet balance
-  const userWallet = await wallet.getWallet(userId);
-  
-  if (userWallet.balance < price) {
-    throw new Error("Insufficient wallet balance");
-  }
-
-  // Create order
+  // Format the order response
   const order: Order = {
-    id: crypto.randomUUID(),
-    userId,
-    bundleId,
-    network: bundle.network,
-    bundleName: bundle.name,
-    volume: bundle.volume,
-    phoneNumber,
-    price,
-    status: "PENDING",
-    createdAt: new Date().toISOString()
+    id: orderData.id,
+    userId: orderData.user_id,
+    bundleId: orderData.bundle_id,
+    network: orderData.bundles.network,
+    bundleName: orderData.bundles.name,
+    volume: orderData.bundles.volume,
+    phoneNumber: orderData.phone_number,
+    price: parseFloat(orderData.price),
+    status: orderData.status,
+    transactionId: orderData.transaction_id,
+    apiProviderId: orderData.api_provider_id,
+    externalReference: orderData.external_reference,
+    errorMessage: orderData.error_message,
+    createdAt: orderData.created_at,
+    completedAt: orderData.completed_at,
   };
 
-  await kv.set(`order:${order.id}`, order);
-
-  // Deduct funds from wallet
-  try {
-    await wallet.deductFunds(
-      userId,
-      price,
-      `Purchase: ${bundle.name} - ${bundle.volume} to ${phoneNumber}`
-    );
-
-    // Simulate API call to provider
-    // In production, this would call the actual API
-    const success = await processDataPurchase(order);
-
-    if (success) {
-      order.status = "SUCCESS";
-      order.completedAt = new Date().toISOString();
-    } else {
-      // Refund if purchase fails
-      order.status = "FAILED";
-      order.errorMessage = "Purchase failed - refunding wallet";
-      order.completedAt = new Date().toISOString();
-      
-      await wallet.addFunds(
-        userId,
-        price,
-        `Refund: ${bundle.name} - ${bundle.volume} (order failed)`
-      );
-    }
-  } catch (error) {
-    // Refund on any error
-    order.status = "FAILED";
-    order.errorMessage = error.message;
-    order.completedAt = new Date().toISOString();
-    
-    try {
-      await wallet.addFunds(
-        userId,
-        price,
-        `Refund: ${bundle.name} - ${bundle.volume} (order failed)`
-      );
-    } catch (refundError) {
-      console.error("Failed to refund:", refundError);
-    }
-  }
-
-  // Update order
-  await kv.set(`order:${order.id}`, order);
+  // Start async processing (in production, this would be a queue job)
+  processOrderAsync(orderId).catch(console.error);
 
   return order;
+}
+
+// Process order asynchronously (simulates external API call)
+async function processOrderAsync(orderId: string) {
+  try {
+    const supabase = client();
+
+    // Get order details
+    const { data: order, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", orderId)
+      .single();
+
+    if (error || !order) {
+      console.error(`Order ${orderId} not found for processing`);
+      return;
+    }
+
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Simulate 90% success rate
+    const success = Math.random() > 0.1;
+    const externalRef = success ? `EXT_${crypto.randomUUID()}` : null;
+    const errorMsg = success ? null : "External API processing failed";
+
+    // Complete the order using the database function
+    const { error: completeError } = await supabase.rpc("complete_bundle_order", {
+      p_order_id: orderId,
+      p_success: success,
+      p_external_reference: externalRef,
+      p_error_message: errorMsg,
+    });
+
+    if (completeError) {
+      console.error(`Failed to complete order ${orderId}:`, completeError);
+    } else {
+      console.log(`Order ${orderId} ${success ? 'completed successfully' : 'failed and refunded'}`);
+    }
+  } catch (error) {
+    console.error(`Error processing order ${orderId}:`, error);
+  }
 }
 
 // Simulate data purchase (replace with actual API call)
@@ -136,91 +167,116 @@ async function processDataPurchase(order: Order): Promise<boolean> {
   return success;
 }
 
-// Get user orders
+// Get user orders from database
 export async function getUserOrders(userId: string): Promise<Order[]> {
-  const allOrders = await kv.getByPrefix("order:");
-  
-  return (allOrders as Order[])
-    .filter(o => o.userId === userId)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const supabase = client();
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select(`
+      *,
+      bundles:bundle_id (
+        id,
+        name,
+        network,
+        volume
+      )
+    `)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to get user orders: ${error.message}`);
+  }
+
+  return (data || []).map(orderData => ({
+    id: orderData.id,
+    userId: orderData.user_id,
+    bundleId: orderData.bundle_id,
+    network: orderData.bundles.network,
+    bundleName: orderData.bundles.name,
+    volume: orderData.bundles.volume,
+    phoneNumber: orderData.phone_number,
+    price: parseFloat(orderData.price),
+    status: orderData.status,
+    transactionId: orderData.transaction_id,
+    apiProviderId: orderData.api_provider_id,
+    externalReference: orderData.external_reference,
+    errorMessage: orderData.error_message,
+    createdAt: orderData.created_at,
+    completedAt: orderData.completed_at,
+  }));
 }
 
-// Get all orders (admin only)
+// Get all orders (admin only) from database
 export async function getAllOrders(): Promise<Order[]> {
-  const allOrders = await kv.getByPrefix("order:");
-  
-  return (allOrders as Order[])
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-}
+  const supabase = client();
 
-// API Provider Management
-export interface ApiProvider {
-  id: string;
-  name: string;
-  priority: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt?: string;
-}
+  const { data, error } = await supabase
+    .from("orders")
+    .select(`
+      *,
+      bundles:bundle_id (
+        id,
+        name,
+        network,
+        volume
+      ),
+      user_profiles:user_id (
+        id,
+        name,
+        email
+      )
+    `)
+    .order("created_at", { ascending: false });
 
-// Create API provider (admin only)
-export async function createProvider(name: string, priority: number) {
-  const id = crypto.randomUUID();
-  
-  const provider: ApiProvider = {
-    id,
-    name,
-    priority,
-    isActive: false,
-    createdAt: new Date().toISOString()
-  };
-
-  await kv.set(`provider:${id}`, provider);
-  
-  return provider;
-}
-
-// Update provider (admin only)
-export async function updateProvider(id: string, updates: Partial<Omit<ApiProvider, "id" | "createdAt">>) {
-  const provider = await kv.get(`provider:${id}`);
-  
-  if (!provider) {
-    throw new Error("Provider not found");
+  if (error) {
+    throw new Error(`Failed to get all orders: ${error.message}`);
   }
 
-  const updatedProvider = {
-    ...provider,
-    ...updates,
-    updatedAt: new Date().toISOString()
-  };
-
-  await kv.set(`provider:${id}`, updatedProvider);
-  
-  return updatedProvider as ApiProvider;
+  return (data || []).map(orderData => ({
+    id: orderData.id,
+    userId: orderData.user_id,
+    bundleId: orderData.bundle_id,
+    network: orderData.bundles.network,
+    bundleName: orderData.bundles.name,
+    volume: orderData.bundles.volume,
+    phoneNumber: orderData.phone_number,
+    price: parseFloat(orderData.price),
+    status: orderData.status,
+    transactionId: orderData.transaction_id,
+    apiProviderId: orderData.api_provider_id,
+    externalReference: orderData.external_reference,
+    errorMessage: orderData.error_message,
+    createdAt: orderData.created_at,
+    completedAt: orderData.completed_at,
+  }));
 }
 
-// Set active provider (admin only)
-export async function setActiveProvider(id: string) {
-  // Deactivate all providers
-  const allProviders = await getAllProviders();
-  
-  for (const provider of allProviders) {
-    if (provider.isActive) {
-      await updateProvider(provider.id, { isActive: false });
-    }
-  }
-
-  // Activate selected provider
-  return await updateProvider(id, { isActive: true });
-}
-
-// Get all providers
+// Get all providers from database
 export async function getAllProviders(): Promise<ApiProvider[]> {
-  const providers = await kv.getByPrefix("provider:");
-  return (providers as ApiProvider[]).sort((a, b) => a.priority - b.priority);
+  const supabase = client();
+
+  const { data, error } = await supabase
+    .from("api_providers")
+    .select("*")
+    .order("priority", { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to get providers: ${error.message}`);
+  }
+
+  return (data || []).map(provider => ({
+    id: provider.id,
+    name: provider.name,
+    priority: provider.priority,
+    isActive: provider.is_active,
+    createdAt: provider.created_at,
+    updatedAt: provider.updated_at,
+  }));
 }
 
-// Get active provider
+// Get active provider from database
 export async function getActiveProvider(): Promise<ApiProvider | null> {
   const providers = await getAllProviders();
   return providers.find(p => p.isActive) || null;
